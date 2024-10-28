@@ -25,7 +25,7 @@ pub fn run() {
                                 }
                                 if shortcut.matches(Modifiers::ALT | Modifiers::CONTROL, Code::KeyN)
                                 {
-                                    let _ = app.emit("enigo-event", "Delete");
+                                    let _ = app.emit("copy-event", "");
                                 }
                             }
                         })
@@ -34,9 +34,20 @@ pub fn run() {
             }
             {
                 let handle = app.handle().clone();
-                app.listen("enigo-event", move |event| {
-                    println!("enigo: {}", event.payload());
-
+                app.listen("copy-event", move |_| {
+                    println!("Copy handle");
+                    copy_prompt();
+                    handle.emit("delete-event", "").unwrap();
+                });
+                let handle = app.handle().clone();
+                app.listen("delete-event", move |_| {
+                    println!("Delete handle");
+                    delete_prompt();
+                    handle.emit("print-event", "").unwrap();
+                });
+                let handle = app.handle().clone();
+                app.listen("print-event", move |_| {
+                    println!("Print clipboard handle");
                     get_context(&handle);
                 });
                 app.listen("window-event", move |event| {
@@ -50,27 +61,23 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
-fn get_context(app_handle: &AppHandle) {
-    println!("preparing to copy text...");
-
-    handle_selection();
-
-    println!("----------> finished handle_selection");
-    let user_prompt = app_handle.clipboard().read_text().unwrap_or("".to_string());
-
-    println!("----------> finished getting user_prompt");
-    println!("copied... {}", user_prompt);
+fn delete_prompt() {
+    println!("preparing to delete text...");
+    let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
+    enigo.key(Key::Backspace, Direction::Click).unwrap();
+    println!("----------> finished deleting");
 }
 
-fn handle_selection() {
+fn copy_prompt() {
+    println!("preparing to copy text...");
     let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
     #[cfg(target_os = "macos")]
     {
         enigo.key(Key::Meta, Direction::Release).unwrap();
         // copy
         enigo.key(Key::Meta, Direction::Press).unwrap();
-        // enigo.key(Key::Unicode('c'), Direction::Click).unwrap();
-        enigo.raw(8, Direction::Click).unwrap();
+        enigo.key(Key::Unicode('c'), Direction::Click).unwrap();
+        // enigo.raw(8, Direction::Click).unwrap();
         enigo.key(Key::Meta, Direction::Release).unwrap();
     }
 
@@ -81,6 +88,12 @@ fn handle_selection() {
         enigo.key(Key::Unicode('c'), Direction::Click).unwrap();
         enigo.key(Key::LControl, Direction::Release).unwrap();
     }
+    println!("----------> finished copying");
+}
 
-    enigo.key(Key::Backspace, Direction::Click).unwrap();
+fn get_context(app_handle: &AppHandle) {
+    let user_prompt = app_handle.clipboard().read_text().unwrap_or("".to_string());
+
+    println!("----------> finished getting user_prompt");
+    println!("copied... {}", user_prompt);
 }

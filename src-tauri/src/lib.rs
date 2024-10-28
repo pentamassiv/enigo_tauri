@@ -5,12 +5,27 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 
 use enigo::{Direction, Enigo, Key, Keyboard};
 
+#[tauri::command]
+fn greet(app_handle: tauri::AppHandle) {
+    println!("Hello I was invoked from JavaScript!");
+    std::thread::sleep(std::time::Duration::from_secs(2));
+    app_handle.emit("wait-event", "").unwrap();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![greet])
         .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
-            #[cfg(desktop)]
+            let app_handle = app.handle().clone();
+
+            // Spawn a new thread to emit an event every 20 seconds
+            std::thread::spawn(move || loop {
+                std::thread::sleep(std::time::Duration::from_secs(20));
+                app_handle.emit("copy-event", "20 seconds passed").unwrap();
+            });
+
             {
                 use tauri_plugin_global_shortcut::{Code, Modifiers, ShortcutState};
 
@@ -61,16 +76,10 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
-fn delete_prompt() {
-    println!("preparing to delete text...");
-    let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
-    enigo.key(Key::Backspace, Direction::Click).unwrap();
-    println!("----------> finished deleting");
-}
-
 fn copy_prompt() {
     println!("preparing to copy text...");
     let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
+    println!("created enigo...");
     #[cfg(target_os = "macos")]
     {
         enigo.key(Key::Meta, Direction::Release).unwrap();
@@ -89,6 +98,13 @@ fn copy_prompt() {
         enigo.key(Key::LControl, Direction::Release).unwrap();
     }
     println!("----------> finished copying");
+}
+
+fn delete_prompt() {
+    println!("preparing to delete text...");
+    let mut enigo = Enigo::new(&enigo::Settings::default()).unwrap();
+    enigo.key(Key::Backspace, Direction::Click).unwrap();
+    println!("----------> finished deleting");
 }
 
 fn get_context(app_handle: &AppHandle) {
